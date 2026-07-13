@@ -60,7 +60,9 @@ canaries=(
 )
 corpus=$(cat CONDUCTOR.md skills/*.md)
 for c in "${canaries[@]}"; do
-  printf '%s' "$corpus" | grep -qF "$c" || { note "LOST: \"$c\""; fail=1; }
+  # herestring, not a pipe: grep -q exits on first match and a pipe would let
+  # printf die of SIGPIPE, which pipefail reports as a spurious failure
+  grep -qF "$c" <<<"$corpus" || { note "LOST: \"$c\""; fail=1; }
 done
 [ "$fail" -eq 0 ] && note "all $(echo "${#canaries[@]}") canaries present" || true
 

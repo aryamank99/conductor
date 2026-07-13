@@ -15,10 +15,10 @@ This contract is the always-loaded **spine**. The detailed procedure for each ph
 Run Codex headless via Bash from the project root:
 
 ```bash
-caffeinate -is codex exec --full-auto -c model_reasoning_effort="xhigh" --output-last-message /tmp/codex-last.txt "<task spec>"
+caffeinate -is codex exec --full-auto -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
 ```
 
-**Default every run to `xhigh`** (the user's standing preference — maximum reasoning for delegated work; the template pins it explicitly so it's robust to the global default changing). Downshift only for a genuinely trivial/mechanical chore. Full flag set, the effort policy, resume, the orientation packet, and the wait-while-running policy → open `skills/delegating-to-codex.md`.
+**Pin the model explicitly and default to `high` effort** (established by the 2026-07-10 implementer eval: high matched xhigh on quality at equal token cost with lower wall-clock; the pin prevents a config/app update silently swapping the implementer). Upshift to `xhigh` for genuinely hard, architecture- or correctness-critical work; downshift only for a trivial/mechanical chore. Full flag set, the effort policy, resume, the orientation packet, and the wait-while-running policy → open `skills/delegating-to-codex.md`.
 
 **Long runs that can outlive the session must be detached OS orphans** (`nohup … & disown`, rendezvous via a `.status` sentinel file), never harness `run_in_background` — it dies at session boundaries (2026-06-27 incident). → `skills/delegating-to-codex.md`.
 
@@ -32,7 +32,7 @@ Independent of tier, the **failure-modes gate** binds any *delegated* task whose
 ## Dispatch table — phase → skill, and the rule that binds it
 | Phase | Open this skill | Rule (binding even before you open it) |
 |---|---|---|
-| Running Codex (any dispatch) | `skills/delegating-to-codex.md` | Default `xhigh` effort (downshift only for trivial chores); `caffeinate -is`; long runs detached (`nohup`/`.status` sentinel), never harness `run_in_background`; read only `--output-last-message`. |
+| Running Codex (any dispatch) | `skills/delegating-to-codex.md` | Pinned model, default `high` effort (upshift to `xhigh` for hard tasks, downshift only for trivial chores); `caffeinate -is`; long runs detached (`nohup`/`.status` sentinel), never harness `run_in_background`; read only `--output-last-message`. |
 | Writing the work order (every non-trivial task) | `skills/task-specs.md` | 5-part spec (Goal/Files/Requirements/Constraints/Verification). Pillars become criteria, not adjectives. |
 | Spec crosses a process boundary, or reliability/observability is active | `skills/failure-modes.md` | **Hard gate: no dispatch until the spec declares failure modes & observability as concrete criteria.** Verify plan-tier artifacts with `check-spec-pillars.sh`. |
 | Planning a plan-tier feature | `skills/plan-docs.md` | Write `plans/<feature>.md` (decomposition, NFR/pillar section, Register, verification plan) BEFORE any dispatch. |
