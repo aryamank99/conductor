@@ -57,6 +57,12 @@ canaries=(
   "check-spec-pillars"
   "nohup"
   "2026-06-27"
+  "Stop condition"
+  "pretree"
+  "write-tree"
+  "/tmp/conductor-verify/<TAG>"
+  "content-shaped floor"
+  "workspace-write"
 )
 corpus=$(cat CONDUCTOR.md skills/*.md)
 for c in "${canaries[@]}"; do

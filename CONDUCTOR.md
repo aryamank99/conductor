@@ -15,12 +15,16 @@ This contract is the always-loaded **spine**. The detailed procedure for each ph
 Run Codex headless via Bash from the project root:
 
 ```bash
-caffeinate -is codex exec --full-auto -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
+caffeinate -is codex exec --sandbox workspace-write -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
 ```
 
 **Pin the model explicitly and default to `high` effort** (established by the 2026-07-10 implementer eval: high matched xhigh on quality at equal token cost with lower wall-clock; the pin prevents a config/app update silently swapping the implementer). Upshift to `xhigh` for genuinely hard, architecture- or correctness-critical work; downshift only for a trivial/mechanical chore. Full flag set, the effort policy, resume, the orientation packet, and the wait-while-running policy → open `skills/delegating-to-codex.md`.
 
+**Implementer overshoot (GPT 5.6 family) — every spec must define done and say to stop there.** The current implementer models tend to do more than asked: satisfy every criterion, then keep going (drive-by refactors, bonus tests, "improvements" — in bad cases destructive ones). The spec's floors (criteria) and fences (files) don't bound this; only an explicit ceiling does. Every non-trivial spec therefore ends with a **Stop condition** section (→ `skills/task-specs.md`), and the review loop treats unrequested work in the diff as automatic revision material even when it's good work. Noticed-but-not-asked improvements belong in `implementation-notes.md`, not the diff.
+
 **Long runs that can outlive the session must be detached OS orphans** (`nohup … & disown`, rendezvous via a `.status` sentinel file), never harness `run_in_background` — it dies at session boundaries (2026-06-27 incident). → `skills/delegating-to-codex.md`.
+
+**Never trust a success signal over the artifact** (2026-07-25, four incidents in one session). A model's self-report of its own identity, a `done` sentinel written unconditionally by a failed arm, an `--output-last-message` file displaced by the 150k Stop hook, and a `[ -s file ]` check that accepted a 306-byte apology — one bug, four costumes. A completion signal says a process ended, not that it delivered. **Verify the artifact: assert a size floor plus a marker the real output must contain, and keep the `.log` as the fallback transcript.** → `skills/delegating-to-codex.md`, `skills/context-economics.md`.
 
 ## Work-size routing — pick the tier, then follow its row in the dispatch table
 - **Trivial (≤ ~5 lines):** Claude does it directly. No spec, no doc, no skill.
@@ -32,14 +36,14 @@ Independent of tier, the **failure-modes gate** binds any *delegated* task whose
 ## Dispatch table — phase → skill, and the rule that binds it
 | Phase | Open this skill | Rule (binding even before you open it) |
 |---|---|---|
-| Running Codex (any dispatch) | `skills/delegating-to-codex.md` | Pinned model, default `high` effort (upshift to `xhigh` for hard tasks, downshift only for trivial chores); `caffeinate -is`; long runs detached (`nohup`/`.status` sentinel), never harness `run_in_background`; read only `--output-last-message`. |
-| Writing the work order (every non-trivial task) | `skills/task-specs.md` | 5-part spec (Goal/Files/Requirements/Constraints/Verification). Pillars become criteria, not adjectives. |
+| Running Codex (any dispatch) | `skills/delegating-to-codex.md` | Pinned model, default `high` effort (upshift to `xhigh` for hard tasks, downshift only for trivial chores); `caffeinate -is`; **pre-dispatch snapshot of untracked state (`pretree` + `write-tree`) before every run**; long runs detached (`nohup`/`.status` sentinel), never harness `run_in_background`; read only the **verified** `--output-last-message` file — size + expected-marker floor, never mere existence; `.log` is the fallback transcript. |
+| Writing the work order (every non-trivial task) | `skills/task-specs.md` | 6-part spec (Goal/Files/Requirements/Constraints/Verification/**Stop condition**). Pillars become criteria, not adjectives. Every spec defines *done* and says to stop there — unrequested work is revision material. |
 | Spec crosses a process boundary, or reliability/observability is active | `skills/failure-modes.md` | **Hard gate: no dispatch until the spec declares failure modes & observability as concrete criteria.** Verify plan-tier artifacts with `check-spec-pillars.sh`. |
 | Planning a plan-tier feature | `skills/plan-docs.md` | Write `plans/<feature>.md` (decomposition, NFR/pillar section, Register, verification plan) BEFORE any dispatch. |
 | Stress-testing the plan | `skills/plan-review-panel.md` | Parallel read-only Codex reviewers, one lens each; always include the assumptions-audit lens. |
 | Resolving ambiguity (plan-tier) | `skills/decisions-register.md` | **Needs-sign-off rows BLOCK dispatch.** No implementation runs until the user answers them. When unsure which bucket → needs-sign-off. |
 | After EVERY Codex run | `skills/review-loop.md` | Mandatory, layered: verify commands → conformance diff → judgment → ledger audit. Never accept sight-unseen. Max 2 revision rounds, then escalate. |
-| UI-affecting change | `skills/ui-verification.md` | Diffs don't show pixels — verify with screenshots before accepting. Verifier runs `-s danger-full-access`, not `--full-auto`. |
+| UI-affecting change | `skills/ui-verification.md` | Diffs don't show pixels — verify with screenshots before accepting. Verifier runs `-s danger-full-access`, not `--sandbox workspace-write` — so it is NEVER dispatched from the project root: scratch cwd under `/tmp/conductor-verify/<TAG>/`, spec never mentions the repo path. |
 | "summary" / "run report" | `skills/run-reports.md` | Dispatch log per run; real spend ≈ (input − cached) + output. |
 | Running 2+ conductors | `skills/parallel-conductors.md` | One worktree = one conductor = one branch; never two in one tree; disjoint work only. |
 | Managing context / hit a gate | `skills/context-economics.md` | Read diffs not files; gate-blocked resume → respawn, never `!force`. |

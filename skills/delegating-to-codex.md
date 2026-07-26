@@ -8,22 +8,37 @@ Run Codex headless via Bash from the project root.
 **Short, synchronous runs** (you'll wait it out this turn) — foreground is fine:
 
 ```bash
-caffeinate -is codex exec --full-auto -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
+caffeinate -is codex exec --sandbox workspace-write -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
 ```
 
 - `caffeinate -is` keeps the Mac awake for the duration of the run — without it, lid-closed/battery sleep suspends Codex mid-task (turned a 2-minute task into a 2-hour wall clock once).
-- `--full-auto` = sandboxed workspace-write, no approval prompts. (CLI 0.144.0 emits a deprecation warning for `--full-auto` → `--sandbox workspace-write`; functionally identical, swap when convenient.)
+- `--sandbox workspace-write` = writes confined to the workspace, no approval prompts. (Replaces the older `--full-auto` shorthand, deprecated in CLI 0.144.0; functionally identical.)
 - Revisions: `codex exec resume --last "<review feedback>"` — keeps Codex's session context so you don't re-explain the task.
 - Read `/tmp/codex-last.txt` for Codex's summary instead of keeping its full transcript in context.
+
+## Pre-dispatch snapshot (every dispatch, foreground or detached)
+`--sandbox workspace-write` confines Codex to the workspace, but *inside* the workspace it can delete or rewrite **untracked** files (`.env`, local data, scratch work) — invisible to `git diff` and unrecoverable from history. Before every dispatch, snapshot from the project root (pick a `TAG` even for foreground runs):
+
+```bash
+git status --porcelain=v1 -uall > /tmp/codex-$TAG-pretree.txt
+GIT_INDEX_FILE=/tmp/codex-$TAG.index git add -A . \
+  && GIT_INDEX_FILE=/tmp/codex-$TAG.index git write-tree > /tmp/codex-$TAG-snap.txt \
+  && rm -f /tmp/codex-$TAG.index
+```
+
+- The `pretree` listing is the **detector**: the review loop diffs it against post-run state to expose untracked deletions/appearances that `git diff` can't show.
+- The `write-tree` hash is the **undo**: a temp-index tree object capturing every non-ignored file (tracked *and* untracked) without touching the real index, stash list, or working tree. Recover any file with `git show $(cat /tmp/codex-$TAG-snap.txt):<path> > <path>`. The object is unreferenced, so it survives until `git gc` prunes (~2 weeks) — a safety net, not an archive.
+- Same namespacing rules as the sentinels: `$TAG` unique per task and per conductor; add `-pretree.txt`, `-snap.txt`, `.index` to the pre-flight `rm -f` list.
 
 ## Long runs must be detached OS processes — never harness `run_in_background`
 A long run can outlive the session that launched it (a `/clear`, a compaction, the terminal dying). Harness `run_in_background` is torn down at every session boundary, so a Codex run hosted inside it **dies silently mid-task** (2026-06-27: two runs vanished with zero output/files this way). Launch long runs as detached orphans and rendezvous through files, not a task handle. Write the spec to `/tmp/codex-$TAG-prompt.txt` first, then:
 
 ```bash
 TAG=w4a   # unique per task AND per conductor — see namespacing below
-rm -f /tmp/codex-$TAG-last.txt /tmp/codex-$TAG.status /tmp/codex-$TAG.log   # pre-flight: kill stale sentinels
+rm -f /tmp/codex-$TAG-last.txt /tmp/codex-$TAG.status /tmp/codex-$TAG.log \
+      /tmp/codex-$TAG-pretree.txt /tmp/codex-$TAG-snap.txt /tmp/codex-$TAG.index   # pre-flight: kill stale sentinels (then take the pre-dispatch snapshot)
 cat > /tmp/codex-$TAG-run.sh <<EOF
-caffeinate -is codex exec --full-auto -c model="gpt-5.6-sol" -c model_reasoning_effort="high" \\
+caffeinate -is codex exec --sandbox workspace-write -c model="gpt-5.6-sol" -c model_reasoning_effort="high" \\
   --output-last-message /tmp/codex-$TAG-last.txt "\$(cat /tmp/codex-$TAG-prompt.txt)"
 echo "EXIT=\$?" > /tmp/codex-$TAG.status
 EOF
@@ -34,10 +49,47 @@ nohup bash /tmp/codex-$TAG-run.sh > /tmp/codex-$TAG.log 2>&1 < /dev/null & disow
 - The wrapper writes `/tmp/codex-$TAG.status` (`EXIT=<code>`) **after** Codex returns — authoritative completion signal, written on success *and* crash. `--output-last-message` is written by Codex *only on success*, so it alone can't distinguish "done well" from "died."
 - **Pre-flight `rm -f` is mandatory.** Reused tags + a leftover sentinel = a new run read as instantly "done" against the previous run's file.
 - (Heredoc escaping is deliberate: `$TAG` bakes in now; `\$?` / `\$(cat …)` run when the wrapper runs.)
+- **Keep `/tmp/codex-$TAG.log`. It is not just debris — it is the fallback transcript** when the
+  last-message file is empty, truncated, or hijacked (see the next section). Do not delete it until the
+  delivery has been read and accepted.
+
+### `EXIT=0` does not mean you have the answer — verify the artifact (2026-07-25)
+
+Three separate failure modes in one session produced a **successful exit with no usable output**:
+
+| Mode | What it looks like | Detect by |
+|---|---|---|
+| Provider capacity | run burns 120k tokens, then `ERROR: Selected model is at capacity`; **no last-message file at all** | file missing / zero bytes |
+| Host `Stop` hook | full review completes, then a hook fires and the model's *final turn* becomes a meta-message ("I couldn't save `HANDOFF.md` — read-only filesystem"). **That 306-byte meta-message is what lands in the last-message file**; the real answer stays in the `.log` | file present, non-empty, far too small, missing the expected marker |
+| Weak assertion | a re-run driver checked `[ -s file ]`, so the 306-byte meta-message passed as `OK` | the check itself |
+
+So: **assert a content-shaped floor, never mere existence or non-emptiness.** Size *and* an expected
+marker the real deliverable must contain:
+
+```bash
+MIN=2000                     # bytes; set from what this deliverable actually looks like
+MARK='LOCATION:'             # a string the real output must contain — task-specific
+f=/tmp/codex-$TAG-last.txt
+if [ -s "$f" ] && [ "$(wc -c < "$f")" -ge "$MIN" ] && grep -q "$MARK" "$f"; then
+  echo "OK $(wc -c < "$f") bytes"
+else
+  echo "SUSPECT last-message ($(wc -c < "$f" 2>/dev/null || echo 0) bytes) — recover from the transcript"
+  grep -E "$MARK" /tmp/codex-$TAG.log | sort -u > /tmp/codex-$TAG-recovered.txt
+fi
+```
+
+**The work is usually not lost — only the capture is.** In the hook case the entire 64-finding review
+was sitting in the 607 KB `.log`; recovering it was a one-line `grep`. Check the transcript before
+re-running anything: a re-run costs full price to reproduce output you already have.
+
+**General rule, learned four times over: never trust a success signal over the artifact.** A model's
+self-report of its own identity, a `done` sentinel written unconditionally by a failed arm, a
+last-message file displaced by a host hook, and a non-empty check that accepted 306 bytes — same bug,
+four costumes. Verify the thing itself.
 
 ### Monitoring (keep raw output out of context)
 Poll cheap signals; never read the streaming `.log` into context:
-- **Completion:** `[ -f /tmp/codex-$TAG.status ]`. Then classify — `EXIT=0` → read `/tmp/codex-$TAG-last.txt` (the summary); `EXIT≠0` → crashed, read the tail of `/tmp/codex-$TAG.log`.
+- **Completion:** `[ -f /tmp/codex-$TAG.status ]`. Then classify — `EXIT=0` → **run the artifact check above**, then read `/tmp/codex-$TAG-last.txt`; `EXIT≠0` → crashed, read the tail of `/tmp/codex-$TAG.log`. Never go straight from `EXIT=0` to "delivered."
 - **Liveness (hung vs working):** `pgrep -fl "output-last-message /tmp/codex-$TAG-last.txt"`.
 - Wrap the poll in a harness `run_in_background` watcher that breaks once every tag's `.status` exists, then exits — wakes you without busy-polling your turns. The watcher is disposable: if *it* dies at a boundary, the orphans and their `.status` files persist for the next turn to pick up (see resume).
 

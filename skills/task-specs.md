@@ -8,6 +8,11 @@
 3. **Requirements** — concrete acceptance criteria.
 4. **Constraints** — follow existing code conventions; no new dependencies unless the spec says so.
 5. **Verification** — the exact command(s) that must pass (the project's test/build commands from its Project facts).
+6. **Stop condition** — every spec ends with this section, verbatim shape:
+   - "Done means: the Verification commands pass and every Requirement is met. When that is true, write your summary and STOP."
+   - "Do NOT do work not listed in Requirements — no drive-by refactors, no extra tests beyond those specified, no reformatting of untouched code, no additional features or 'improvements'. If you notice something worth fixing, note it in `implementation-notes.md` (or your final summary for non-ledger tasks) instead of fixing it."
+
+The Stop condition exists because current implementer models (GPT 5.6 family) tend to overshoot: they satisfy every criterion and keep going. The rest of the spec defines floors (criteria that must pass) and fences (files not to touch); this section defines the **ceiling** — what "done" is, and that done means stop. The note-it-don't-do-it clause is the load-bearing half: it gives the model an outlet for initiative that feeds the review/backlog instead of the diff. Unrequested work in the diff is automatic revision material in the review loop, even when it's good work.
 
 Applicable pillars become concrete acceptance criteria here, never adjectives — "all input goes through the existing sanitizer," not "make it secure." (See `plan-docs.md` for the three-point pillar discipline.)
 
