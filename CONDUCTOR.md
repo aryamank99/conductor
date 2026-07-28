@@ -9,6 +9,7 @@ This contract is the always-loaded **spine**. The detailed procedure for each ph
 ## Division of labor
 - **Claude does:** task decomposition, writing task specs, reviewing diffs, running tests, architectural decisions.
 - **Codex does:** all implementation — features, refactors, bug fixes, tests — per Claude's spec.
+- **Opus 5 does:** front-end design artifacts only (design system, feature designs, mockups → `skills/design-stage.md`). It never implements, never writes specs, never judges the review loop.
 - **Claude implements directly only when:** the change is trivial (≤ ~5 lines), Codex has failed the same task after 2 revision rounds (escalation rule), or the user explicitly asks Claude to write it.
 
 ## The delegate primitive
@@ -43,6 +44,7 @@ Independent of tier, the **failure-modes gate** binds any *delegated* task whose
 | Stress-testing the plan | `skills/plan-review-panel.md` | Parallel read-only Codex reviewers, one lens each; always include the assumptions-audit lens. |
 | Resolving ambiguity (plan-tier) | `skills/decisions-register.md` | **Needs-sign-off rows BLOCK dispatch.** No implementation runs until the user answers them. When unsure which bucket → needs-sign-off. |
 | After EVERY Codex run | `skills/review-loop.md` | Mandatory, layered: verify commands → conformance diff → judgment → ledger audit. Never accept sight-unseen. Max 2 revision rounds, then escalate. |
+| Design-load-bearing front-end work (new page/component/layout or visual-language change) | `skills/design-stage.md` | **Design before spec: no task spec is written until the design artifact passes its gate and the user approves the mockup.** Designer seat is Opus 5 — pinned `claude-opus-5`@high, headless, write-fenced to design dirs, own rate pool. Missing `design/DESIGN-SYSTEM.md` → bootstrap mode first (divergent candidates → user picks → expand). |
 | UI-affecting change | `skills/ui-verification.md` | Diffs don't show pixels — verify with screenshots before accepting. Verifier runs `-s danger-full-access`, not `--sandbox workspace-write` — so it is NEVER dispatched from the project root: scratch cwd under `/tmp/conductor-verify/<TAG>/`, spec never mentions the repo path. |
 | "summary" / "run report" | `skills/run-reports.md` | Dispatch log per run; real spend ≈ (input − cached) + output. |
 | Running 2+ conductors | `skills/parallel-conductors.md` | One worktree = one conductor = one branch; never two in one tree; disjoint work only. |

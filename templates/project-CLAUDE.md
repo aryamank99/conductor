@@ -7,4 +7,5 @@
 - **Commands:** test `<cmd>` · build `<cmd>` · dev `<cmd>`
 - **Active pillars:** <subset of: correctness, reliability, performance, scalability, security, observability, maintainability, testability, UX/accessibility, cost/operability>
 - **Default panel lenses:** <derived from the project's surface — e.g. local UI: correctness & edge cases, simplicity/maintainability, UX & accessibility, rendering performance. Add security/scalability/observability lenses only if the project has a server, auth, or external data surface.>
+- **Design language (optional):** <seed for the design stage's bootstrap run — vibe words, reference sites, or a taste skill to start from; omit if no UI. After bootstrap: "established — see `design/DESIGN-SYSTEM.md`". Most pre-existing projects start without one; the first design-load-bearing task creates it (→ `skills/design-stage.md`).>
 - **Quirks:** <anything that breaks naive tooling assumptions — path oddities, PATH conventions, env requirements. "None" is a valid entry.>

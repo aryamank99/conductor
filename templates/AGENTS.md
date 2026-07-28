@@ -7,6 +7,7 @@
 - `app/` — <purpose>
 - `lib/` — <purpose; note co-located test convention if any>
 - `plans/` — feature plan docs and goal ledgers (when present)
+- If `design/DESIGN-SYSTEM.md` exists: binding design language for all UI work — conform to its tokens; deviations are spec deviations.
 - No codebase map yet; if `docs/CODEBASE_MAP.md` exists, orient there first.
 
 ## Commands
