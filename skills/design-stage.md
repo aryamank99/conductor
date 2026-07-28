@@ -10,11 +10,19 @@ Headless, pinned (same reasoning as the Codex pin: an alias like `opus` can drif
 
 ```bash
 caffeinate -is claude -p --model claude-opus-5 --effort high \
-  --allowedTools 'Read,Glob,Grep,Write(plans/<feature>/design/**)' \
-  "<design brief>" > /tmp/design-<TAG>.log 2>&1
+  --allowedTools 'Read,Glob,Grep,Edit(plans/<feature>/design/**)' \
+  < /tmp/design-<TAG>-prompt.txt > /tmp/design-<TAG>-last.txt 2>>/tmp/design-<TAG>.log
 ```
 
-- **Write fence by construction, not instruction.** Feature runs get `Write(plans/<feature>/design/**)`; bootstrap runs get `Write(design/**)`. Opus *cannot* touch implementation code even when it overreaches — same move as the ui-verification rule that never shows the verifier the repo path. Read stays repo-wide: the designer needs the existing UI, product context, and `docs/CODEBASE_MAP.md` if present.
+Two CLI facts, learned the hard way (first live run, 2026-07-28, EXIT=1 with zero artifacts):
+- **The brief goes in on stdin, never as a positional argument.** `--allowedTools` is variadic — a
+  positional prompt after it is consumed as extra tool rules and the run dies with "Input must be
+  provided either through stdin or as a prompt argument".
+- **The write fence is spelled `Edit(<dir>/**)`, not `Write(...)`.** `Write(path)` rules are never
+  matched by file permission checks; `Edit(path)` rules cover ALL file-editing tools including
+  Write.
+
+- **Write fence by construction, not instruction.** Feature runs get `Edit(plans/<feature>/design/**)`; bootstrap runs get `Edit(design/**)`. Opus *cannot* touch implementation code even when it overreaches — same move as the ui-verification rule that never shows the verifier the repo path. Read stays repo-wide: the designer needs the existing UI, product context, and `docs/CODEBASE_MAP.md` if present.
 - **Separate budget.** Opus 5 draws from its own rate pool at half Fable's price (per the 2026-07 model-role eval). Design spend costs the conductor session nothing — this stage *adds* headroom, in line with the spine's founding reason.
 - Runs long enough to outlive the session follow the detach rule: `nohup … & disown` + `.status` sentinel, never harness `run_in_background`. Most design runs are short; dispatch-and-wait is fine.
 - Every dispatch is logged per `skills/run-reports.md` like any Codex run.
