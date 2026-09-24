@@ -8,12 +8,12 @@ Run Codex headless via Bash from the project root.
 **Short, synchronous runs** (you'll wait it out this turn) — foreground is fine:
 
 ```bash
-caffeinate -is codex exec --sandbox workspace-write -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
+caffeinate -is codex exec --sandbox workspace-write -c model="gpt-6-astra" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
 ```
 
 - `caffeinate -is` keeps the Mac awake for the duration of the run — without it, lid-closed/battery sleep suspends Codex mid-task (turned a 2-minute task into a 2-hour wall clock once).
 - `--sandbox workspace-write` = writes confined to the workspace, no approval prompts. (Replaces the older `--full-auto` shorthand, deprecated in CLI 0.144.0; functionally identical.)
-- Revisions: `codex exec resume --last "<review feedback>"` — keeps Codex's session context so you don't re-explain the task.
+- Revisions: `codex exec resume --last "<review feedback>"` — keeps Codex's session context so you don't re-explain the task. NOTE: `resume` rejects `--sandbox` (exit 2, "unexpected argument"); pass the sandbox as config instead — `-c sandbox_mode="workspace-write"` — alongside the usual `-c model=…`/`-c model_reasoning_effort=…`/`--output-last-message` (all accepted; 2026-07-29).
 - Read `/tmp/codex-last.txt` for Codex's summary instead of keeping its full transcript in context.
 
 ## Pre-dispatch snapshot (every dispatch, foreground or detached)
@@ -38,7 +38,7 @@ TAG=w4a   # unique per task AND per conductor — see namespacing below
 rm -f /tmp/codex-$TAG-last.txt /tmp/codex-$TAG.status /tmp/codex-$TAG.log \
       /tmp/codex-$TAG-pretree.txt /tmp/codex-$TAG-snap.txt /tmp/codex-$TAG.index   # pre-flight: kill stale sentinels (then take the pre-dispatch snapshot)
 cat > /tmp/codex-$TAG-run.sh <<EOF
-caffeinate -is codex exec --sandbox workspace-write -c model="gpt-5.6-sol" -c model_reasoning_effort="high" \\
+caffeinate -is codex exec --sandbox workspace-write -c model="gpt-6-astra" -c model_reasoning_effort="high" \\
   --output-last-message /tmp/codex-$TAG-last.txt "\$(cat /tmp/codex-$TAG-prompt.txt)"
 echo "EXIT=\$?" > /tmp/codex-$TAG.status
 EOF
@@ -103,8 +103,8 @@ Detachment only pays off if a cold or compacted orchestrator knows to look. On r
 `/tmp` is shared by every conductor on the machine. Tags must be unique per task **and** per conductor, or two sessions collide on the same sentinel — prefix with the worktree/branch slug (e.g. `TAG=<branch>-w4a`). File-level complement to the one-worktree-one-conductor rule in `parallel-conductors.md`.
 
 ## Model & effort per run
-- **Pin the model: `-c model="gpt-5.6-sol"`.** The delegate template pins both model and effort explicitly. Rationale: `~/.codex/config.toml` silently defaults to Sol already (flipped by a ChatGPT-app update when Sol shipped ~2026-07-09), and an unpinned template let that swap happen invisibly — the pin makes the implementer a deliberate, audited choice that a future app/config update can't move. Override for a one-off with `-c model="<slug>"` (e.g. `gpt-5.5`). Never use `ultra`/`max` (ultra enables automatic multi-agent delegation — changes the process, not just the model).
-- **Default Sol dispatches to `high`, not `xhigh`.** Established by the 2026-07-10 implementer eval (`plans/implementer-eval/readout.md`): Sol@high *matched* Sol@xhigh on the primary metric (revision rounds, 0/0/0 each), blind grading was a wash (xhigh even over-built one UI task), token spend was dead even, and wall-clock was lower at high (−49% on the UI task). Quality parity at equal cost with a speed win ⇒ start at `high`.
+- **Pin the model: `-c model="gpt-6-astra"`** (user decision 2026-09-06, replacing `gpt-5.6-sol`; slug confirmed in `~/.codex/models_cache.json`; needs CLI ≥ 0.153.4 — 0.144.0 returned "requires a newer version of Codex" (400); efforts low–xhigh plus `max`/`ultra`). The delegate template pins both model and effort explicitly. Rationale: `~/.codex/config.toml` silently defaulted to Sol when Sol shipped (~2026-07-09) and now to Astra — an unpinned template lets such swaps happen invisibly; the pin makes the implementer a deliberate, audited choice that a future app/config update can't move. Override for a one-off with `-c model="<slug>"` (e.g. `gpt-5.6-sol`, `gpt-5.5`). Never use `ultra`/`max` (ultra enables automatic multi-agent delegation — changes the process, not just the model).
+- **Default dispatches to `high`, not `xhigh`.** Established on Sol by the 2026-07-10 implementer eval (not yet re-run on Astra) (`plans/implementer-eval/readout.md`): Sol@high *matched* Sol@xhigh on the primary metric (revision rounds, 0/0/0 each), blind grading was a wash (xhigh even over-built one UI task), token spend was dead even, and wall-clock was lower at high (−49% on the UI task). Quality parity at equal cost with a speed win ⇒ start at `high`.
 - **Upshift to `xhigh` for genuinely hard / correctness-critical work** — this is the standing escape hatch, kept deliberately. The same eval showed xhigh can buy a cleaner module boundary on multi-file features (Task 1), so upshift when architecture or edge-case correctness is the crux; stay at `high` for routine features, refactors, bug fixes, and restyle-shaped UI work.
 - **Downshift to `medium`/`low`** only for a genuinely trivial/mechanical chore — a rename, a one-line config bump — where even `high` reasoning is pure waste.
 

@@ -6,7 +6,7 @@
 Before user sign-off, have Codex critique the plan with parallel read-only reviewers:
 
 ```bash
-codex exec -s read-only -c model_reasoning_effort="xhigh" "Review plans/<feature>.md against this codebase through ONE lens only: <lens>. List concrete issues with file references. Do NOT write code."
+codex exec -s read-only -c model="gpt-6-astra" -c model_reasoning_effort="xhigh" "Review plans/<feature>.md against this codebase through ONE lens only: <lens>. List concrete issues with file references. Do NOT write code."
 ```
 
 - Use the host project's **default panel lenses** (declared in its Project facts). Lenses follow the project's surface: a local UI gets correctness/simplicity/UX/rendering-performance; add security/scalability/observability lenses only for projects with a server, auth, or external data surface.

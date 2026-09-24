@@ -30,7 +30,14 @@ One worktree per run, same base commit per task. Ship the best diff per task thr
 3. **teach-UI Task 4** (practice restyle) — UI task; graded via `skills/ui-verification.md` screenshot flow (verifier at `-s danger-full-access`). Arms: S-hi, S-x.
 
 ## Protocol (fixed — the Opus conductor executes, it does not redesign)
-1. **Preflight:** one trivial `codex exec` per distinct model slug with model pinned; confirm output reports the requested model + effort. Abort and report if rejected.
+1. **Preflight:** one trivial `codex exec` per distinct model slug with model pinned; confirm the pin took. **Verify against rollout telemetry, NOT the model's self-report** — corrected 2026-07-25, see below. Abort and report if the pin did not take.
+
+   > ⚠️ **A model's self-report of its own identity is not evidence.** The original wording here ("confirm output reports the requested model + effort") is unsound. Observed 2026-07-25: a Codex arm answered `gpt-5, high reasoning effort` while the rollout for that same run recorded `payload.model = gpt-5.6-sol`, `payload.effort = xhigh`. The pin worked; the model was simply wrong about itself. The failure is symmetric and the dangerous direction is the other one — a self-report can just as easily *confirm* a pin that silently failed, which is exactly what this preflight exists to catch. Check the rollout instead:
+   > ```bash
+   > rp=$(ls -t ~/.codex/sessions/$(date +%Y/%m/%d)/*.jsonl | head -1)
+   > grep -o '"model":"[^"]*"' "$rp" | tail -1
+   > grep -o '"effort":"[^"]*"' "$rp" | tail -1
+   > ```
 2. Specs per `skills/task-specs.md` (failure-modes gate where applicable). Frozen before any dispatch.
 3. Dispatch arms per task (concurrent OK — disjoint worktrees).
 4. Standard review loop on every delivery (`skills/review-loop.md`), max 2 revision rounds then escalate. Record rounds per run.

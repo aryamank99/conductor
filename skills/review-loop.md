@@ -7,7 +7,7 @@ Layered — spend Claude's intelligence only on what commands can't answer:
 2. **Conformance:** `git status` + `git diff` against the spec. Every acceptance criterion met; no files touched outside scope; no silent scope creep.
    **Untracked-state check:** `git diff` is blind to untracked files. Run `git status --porcelain=v1 -uall > /tmp/codex-$TAG-posttree.txt && diff /tmp/codex-$TAG-pretree.txt /tmp/codex-$TAG-posttree.txt` — lines present only in `pretree` are files the run deleted or renamed outside git's view; interrogate every one, and recover via `git show $(cat /tmp/codex-$TAG-snap.txt):<path>` (see the pre-dispatch snapshot in `delegating-to-codex.md`). If no `pretree` file exists for this tag (run dispatched before the snapshot rule, or snapshot skipped), note that in the review and proceed — don't invent a baseline.
    **Unrequested work is revision material even when it's good** — the spec's Stop condition told the implementer to note improvements, not make them; letting good-but-unasked work through trains the overshoot back in. Send it back with "revert X, keep it as a note." Never accept changes sight-unseen.
-3. **Judgment (where Fable earns its keep), scaled to diff size and risk:**
+3. **Judgment (where the orchestrator earns its keep), scaled to diff size and risk:**
    - Adversarial read — hunt for a reason to reject: edge cases the tests miss, regressions to neighboring behavior, state/async hazards.
    - Cross-codebase effects: what elsewhere assumed the thing this diff changed? (Codex worked narrow; the orchestrator holds the map.)
    - Probe tests: write 1–3 targeted tests attacking the most-likely-wrong spots and run them — cheaper and more reliable than re-reading everything.

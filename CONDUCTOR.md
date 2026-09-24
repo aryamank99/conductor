@@ -7,21 +7,22 @@ In a Conductor-run repo, Claude's job is to plan, decompose, specify, review, an
 This contract is the always-loaded **spine**. The detailed procedure for each phase lives in a skill file under `~/.claude/conductor/skills/`, pulled in only when that phase is active (so the orchestrator's context stays lean). The dispatch table below is the menu. **When a phase's rule says "→ open `skills/<x>.md`", read that file before acting — do not run the phase from memory; the skills carry battle-tested specifics this spine omits.**
 
 ## Division of labor
-- **Claude does:** task decomposition, writing task specs, reviewing diffs, running tests, architectural decisions.
+- **Claude (the orchestrator) does:** task decomposition, writing task specs, reviewing diffs, running tests, architectural decisions.
 - **Codex does:** all implementation — features, refactors, bug fixes, tests — per Claude's spec.
-- **Opus 5 does:** front-end design artifacts only (design system, feature designs, mockups → `skills/design-stage.md`). It never implements, never writes specs, never judges the review loop.
+- **The orchestrator's model is not pinned here.** It is whatever the interactive session runs (the `model` key in `~/.claude/settings.json`; since 2026-09-24, by user decision, the exact ID `claude-fable-5-1[1m]` at effort `high`, replacing the alias `opus[1m]`). Skills say "the orchestrator", never a model name, so a model change does not make them stale.
+- **Fable 5.1 (designer seat) does:** front-end design artifacts only (design system, feature designs, mockups → `skills/design-stage.md`). It never implements, never writes specs, never judges the review loop.
 - **Claude implements directly only when:** the change is trivial (≤ ~5 lines), Codex has failed the same task after 2 revision rounds (escalation rule), or the user explicitly asks Claude to write it.
 
 ## The delegate primitive
 Run Codex headless via Bash from the project root:
 
 ```bash
-caffeinate -is codex exec --sandbox workspace-write -c model="gpt-5.6-sol" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
+caffeinate -is codex exec --sandbox workspace-write -c model="gpt-6-astra" -c model_reasoning_effort="high" --output-last-message /tmp/codex-last.txt "<task spec>"
 ```
 
 **Pin the model explicitly and default to `high` effort** (established by the 2026-07-10 implementer eval: high matched xhigh on quality at equal token cost with lower wall-clock; the pin prevents a config/app update silently swapping the implementer). Upshift to `xhigh` for genuinely hard, architecture- or correctness-critical work; downshift only for a trivial/mechanical chore. Full flag set, the effort policy, resume, the orientation packet, and the wait-while-running policy → open `skills/delegating-to-codex.md`.
 
-**Implementer overshoot (GPT 5.6 family) — every spec must define done and say to stop there.** The current implementer models tend to do more than asked: satisfy every criterion, then keep going (drive-by refactors, bonus tests, "improvements" — in bad cases destructive ones). The spec's floors (criteria) and fences (files) don't bound this; only an explicit ceiling does. Every non-trivial spec therefore ends with a **Stop condition** section (→ `skills/task-specs.md`), and the review loop treats unrequested work in the diff as automatic revision material even when it's good work. Noticed-but-not-asked improvements belong in `implementation-notes.md`, not the diff.
+**Implementer overshoot (observed on the GPT 5.6 family; assumed to hold for GPT-6 Astra until an eval shows otherwise) — every spec must define done and say to stop there.** The current implementer models tend to do more than asked: satisfy every criterion, then keep going (drive-by refactors, bonus tests, "improvements" — in bad cases destructive ones). The spec's floors (criteria) and fences (files) don't bound this; only an explicit ceiling does. Every non-trivial spec therefore ends with a **Stop condition** section (→ `skills/task-specs.md`), and the review loop treats unrequested work in the diff as automatic revision material even when it's good work. Noticed-but-not-asked improvements belong in `implementation-notes.md`, not the diff.
 
 **Long runs that can outlive the session must be detached OS orphans** (`nohup … & disown`, rendezvous via a `.status` sentinel file), never harness `run_in_background` — it dies at session boundaries (2026-06-27 incident). → `skills/delegating-to-codex.md`.
 
@@ -44,7 +45,7 @@ Independent of tier, the **failure-modes gate** binds any *delegated* task whose
 | Stress-testing the plan | `skills/plan-review-panel.md` | Parallel read-only Codex reviewers, one lens each; always include the assumptions-audit lens. |
 | Resolving ambiguity (plan-tier) | `skills/decisions-register.md` | **Needs-sign-off rows BLOCK dispatch.** No implementation runs until the user answers them. When unsure which bucket → needs-sign-off. |
 | After EVERY Codex run | `skills/review-loop.md` | Mandatory, layered: verify commands → conformance diff → judgment → ledger audit. Never accept sight-unseen. Max 2 revision rounds, then escalate. |
-| Design-load-bearing front-end work (new page/component/layout or visual-language change) | `skills/design-stage.md` | **Design before spec: no task spec is written until the design artifact passes its gate and the user approves the mockup.** Designer seat is Opus 5 — pinned `claude-opus-5`@high, headless, write-fenced to design dirs, own rate pool. Missing `design/DESIGN-SYSTEM.md` → bootstrap mode first (divergent candidates → user picks → expand). |
+| Design-load-bearing front-end work (new page/component/layout or visual-language change) | `skills/design-stage.md` | **Design before spec: no task spec is written until the design artifact passes its gate and the user approves the mockup.** Designer seat is Fable 5.1 — pinned `claude-fable-5-1`@high, headless, write-fenced to design dirs (user decision 2026-09-02, replacing Opus 5). Missing `design/DESIGN-SYSTEM.md` → bootstrap mode first (divergent candidates → user picks → expand). |
 | UI-affecting change | `skills/ui-verification.md` | Diffs don't show pixels — verify with screenshots before accepting. Verifier runs `-s danger-full-access`, not `--sandbox workspace-write` — so it is NEVER dispatched from the project root: scratch cwd under `/tmp/conductor-verify/<TAG>/`, spec never mentions the repo path. |
 | "summary" / "run report" | `skills/run-reports.md` | Dispatch log per run; real spend ≈ (input − cached) + output. |
 | Running 2+ conductors | `skills/parallel-conductors.md` | One worktree = one conductor = one branch; never two in one tree; disjoint work only. |
