@@ -63,6 +63,9 @@ canaries=(
   "/tmp/conductor-verify/<TAG>"
   "content-shaped floor"
   "workspace-write"
+  "frontend-design:frontend-design"
+  "design-shot.mjs"
+  "design-fonts.mjs"
 )
 corpus=$(cat CONDUCTOR.md skills/*.md)
 for c in "${canaries[@]}"; do

@@ -87,6 +87,7 @@ CONDUCTOR.md            the always-loaded spine (division of labor, routing, dis
 skills/                 one procedure file per phase, read on demand
 templates/              skeletons for a host project's CLAUDE.md and AGENTS.md
 conductor-init/         the one-command project-wiring skill
+bin/                    designer-seat helpers: mockup screenshots, locally vendored web fonts
 plans/                  decision records and eval designs (why the rules are what they are)
 check-contract.sh       structural self-test for the spine/skills split
 check-spec-pillars.sh   pre-dispatch linter for the failure-modes gate
